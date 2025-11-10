@@ -163,6 +163,13 @@ addEventHandler("restoreOriginalModelVariant", root, function(vehicle, originalM
         -- Restore the original model DFF (this restores the model for all vehicles of this type)
         engineRestoreModel(originalModel)
         
+        -- Clear loaded custom models for this original model so we can reload them later
+        for modelKey, _ in pairs(loadedCustomModels) do
+            if string.find(modelKey, "^" .. originalModel .. "_") then
+                loadedCustomModels[modelKey] = nil
+            end
+        end
+        
         -- Set vehicle model back to original
         setElementModel(vehicle, originalModel)
         
