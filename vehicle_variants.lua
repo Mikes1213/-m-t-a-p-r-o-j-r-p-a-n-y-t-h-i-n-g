@@ -127,11 +127,19 @@ function setVehicleVariantSafe(vehicle, variant1, variant2)
     
     -- If variant1 is 0, restore original model (if it was changed)
     if variant1 == 0 then
-        if vehicleOriginalModels[vehicle] and currentModel ~= originalModel then
+        -- Always restore if we have stored original model
+        if vehicleOriginalModels[vehicle] then
             local success, message = restoreOriginalModel(vehicle)
             if not success then
                 return false, message
             end
+            -- Set variant to 0,0
+            setVehicleVariant(vehicle, 0, variant2)
+            return true, "Przywrócono oryginalny model"
+        else
+            -- No custom model was applied, just set variant normally
+            setVehicleVariant(vehicle, 0, variant2)
+            return true, "Vehicle variant set successfully"
         end
     else
         -- Check if there's a custom model for this variant

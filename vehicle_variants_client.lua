@@ -160,7 +160,12 @@ end)
 addEvent("restoreOriginalModelVariant", true)
 addEventHandler("restoreOriginalModelVariant", root, function(vehicle, originalModel)
     if isElement(vehicle) and originalModel then
+        -- Restore the original model DFF (this restores the model for all vehicles of this type)
+        engineRestoreModel(originalModel)
+        
+        -- Set vehicle model back to original
         setElementModel(vehicle, originalModel)
+        
         triggerServerEvent("onOriginalModelRestored", resourceRoot, vehicle, originalModel)
     end
 end)
