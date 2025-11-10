@@ -75,11 +75,14 @@ end
 
 -- Handle confirmation from client that model was loaded
 addEvent("onCustomModelLoaded", true)
-addEventHandler("onCustomModelLoaded", root, function(vehicle, customID, success, message)
-    if success then
-        outputDebugString("[Vehicle Variants] Custom model " .. customID .. " loaded successfully")
+addEventHandler("onCustomModelLoaded", root, function(vehicle, finalModelID, success, message)
+    if success and isElement(vehicle) then
+        outputDebugString("[Vehicle Variants] Custom model " .. finalModelID .. " loaded successfully")
+        -- Change vehicle model on server side (this syncs to all clients)
+        setElementModel(vehicle, finalModelID)
+        outputDebugString("[Vehicle Variants] Vehicle model changed to " .. finalModelID .. " on server")
     else
-        outputDebugString("[Vehicle Variants] Failed to load custom model " .. customID .. ": " .. tostring(message))
+        outputDebugString("[Vehicle Variants] Failed to load custom model: " .. tostring(message))
     end
 end)
 

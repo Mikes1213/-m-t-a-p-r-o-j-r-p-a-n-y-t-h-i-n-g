@@ -28,19 +28,22 @@ function loadCustomModel(customID, dffPath, txdPath, originalModel)
         local txd = engineLoadTXD(txdPath, true)
         if txd then
             outputChatBox("[DEBUG] TXD loaded, importing...", 255, 255, 0)
+            -- IMPORTANT: Import TXD to custom ID first (we'll use custom ID for the vehicle)
+            local txdImported = false
+            
             -- Try importing to custom ID first
-            local txdImported = engineImportTXD(txd, customID)
-            if not txdImported then
-                -- If custom ID fails, try original model
+            txdImported = engineImportTXD(txd, customID)
+            if txdImported then
+                outputChatBox("[SUCCESS] TXD imported to custom model " .. customID, 0, 255, 0)
+            else
+                -- If custom ID fails, try original model (fallback)
                 txdImported = engineImportTXD(txd, originalModel)
-                if not txdImported then
+                if txdImported then
+                    outputChatBox("[SUCCESS] TXD imported to model " .. originalModel .. " (fallback)", 0, 255, 0)
+                else
                     outputChatBox("[WARNING] Failed to import TXD, continuing without it", 255, 165, 0)
                     outputDebugString("[Vehicle Variants Client] Warning: Failed to import TXD, continuing without it")
-                else
-                    outputChatBox("[SUCCESS] TXD imported to model " .. originalModel, 0, 255, 0)
                 end
-            else
-                outputChatBox("[SUCCESS] TXD imported to model " .. customID, 0, 255, 0)
             end
         else
             -- TXD loading failed, but we can continue without it
