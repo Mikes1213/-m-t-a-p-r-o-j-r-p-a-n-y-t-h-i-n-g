@@ -53,112 +53,130 @@ function replaceVehicleWithCustomModel(vehicle, customModelID, dffPath, txdPath,
         return false, "Invalid vehicle"
     end
     
-    -- Save all vehicle properties
-    local x, y, z = getElementPosition(vehicle)
-    local rx, ry, rz = getElementRotation(vehicle)
-    local health = getElementHealth(vehicle)
-    local color1, color2, color3, color4 = getVehicleColor(vehicle)
-    local paintjob = getVehiclePaintjob(vehicle)
-    local plateText = getVehiclePlateText(vehicle)
-    local locked = isVehicleLocked(vehicle)
-    local engineState = getVehicleEngineState(vehicle)
-    -- Note: getVehicleLightState requires light ID, so we skip saving lights state
-    -- Lights are usually managed automatically by the game
-    local doorStates = {}
-    for i = 0, 5 do
-        doorStates[i] = getVehicleDoorState(vehicle, i)
-    end
-    local wheelStates = {}
-    for i = 0, 3 do
-        wheelStates[i] = getVehicleWheelStates(vehicle, i)
-    end
-    local panelStates = {}
-    for i = 0, 6 do
-        panelStates[i] = getVehiclePanelState(vehicle, i)
-    end
-    
-    -- Save vehicle occupants
-    local driver = getVehicleController(vehicle)
-    local passengers = {}
-    for i = 0, getVehicleMaxPassengers(vehicle) do
-        local passenger = getVehicleOccupant(vehicle, i)
-        if passenger then
-            passengers[i] = passenger
-        end
-    end
-    
-    -- Save element data
-    local allData = {}
-    for key, value in pairs(getAllElementData(vehicle)) do
-        allData[key] = value
-    end
-    
-    -- Store original model for restoration
-    if not vehicleOriginalModels[vehicle] then
-        vehicleOriginalModels[vehicle] = originalModel
-    end
-    
-    -- Create new vehicle with custom model ID
-    local newVehicle = createVehicle(customModelID, x, y, z, rx, ry, rz)
-    
-    if not newVehicle then
-        return false, "Nie udało się stworzyć pojazdu z custom ID: " .. customModelID
-    end
-    
-    -- Restore all properties
-    setElementHealth(newVehicle, health)
-    setVehicleColor(newVehicle, color1, color2, color3, color4)
-    if paintjob then
-        setVehiclePaintjob(newVehicle, paintjob)
-    end
-    setVehiclePlateText(newVehicle, plateText)
-    setVehicleLocked(newVehicle, locked)
-    setVehicleEngineState(newVehicle, engineState)
-    -- Note: Lights state is not saved/restored (getVehicleLightState requires light ID)
-    
-    for i = 0, 5 do
-        if doorStates[i] then
-            setVehicleDoorState(newVehicle, i, doorStates[i])
-        end
-    end
-    
-    for i = 0, 3 do
-        if wheelStates[i] then
-            setVehicleWheelStates(newVehicle, i, wheelStates[i])
-        end
-    end
-    
-    for i = 0, 6 do
-        if panelStates[i] then
-            setVehiclePanelState(newVehicle, i, panelStates[i])
-        end
-    end
-    
-    -- Restore element data
-    for key, value in pairs(allData) do
-        setElementData(newVehicle, key, value)
-    end
-    
-    -- Store original model for new vehicle
-    vehicleOriginalModels[newVehicle] = originalModel
-    
-    -- Restore occupants
-    if driver then
-        warpPedIntoVehicle(driver, newVehicle, 0)
-    end
-    for seat, passenger in pairs(passengers) do
-        if seat > 0 then
-            warpPedIntoVehicle(passenger, newVehicle, seat)
-        end
-    end
-    
-    -- Load custom model on all clients
+    -- First, load custom model on all clients
+    -- Then create vehicle with custom ID (clients need model loaded first)
     triggerClientEvent(root, "loadCustomModelForVehicle", resourceRoot, customModelID, dffPath, txdPath)
     
-    -- Destroy old vehicle
-    destroyElement(vehicle)
+    -- Wait a bit for model to load on clients, then create vehicle
+    setTimer(function()
+        if not isElement(vehicle) then
+            return
+        end
+        
+        -- Save all vehicle properties
+        local x, y, z = getElementPosition(vehicle)
+        local rx, ry, rz = getElementRotation(vehicle)
+        local health = getElementHealth(vehicle)
+        local color1, color2, color3, color4 = getVehicleColor(vehicle)
+        local paintjob = getVehiclePaintjob(vehicle)
+        local plateText = getVehiclePlateText(vehicle)
+        local locked = isVehicleLocked(vehicle)
+        local engineState = getVehicleEngineState(vehicle)
+        -- Note: getVehicleLightState requires light ID, so we skip saving lights state
+        -- Lights are usually managed automatically by the game
+        local doorStates = {}
+        for i = 0, 5 do
+            doorStates[i] = getVehicleDoorState(vehicle, i)
+        end
+        local wheelStates = {}
+        for i = 0, 3 do
+            wheelStates[i] = getVehicleWheelStates(vehicle, i)
+        end
+        local panelStates = {}
+        for i = 0, 6 do
+            panelStates[i] = getVehiclePanelState(vehicle, i)
+        end
+        
+        -- Save vehicle occupants
+        local driver = getVehicleController(vehicle)
+        local passengers = {}
+        for i = 0, getVehicleMaxPassengers(vehicle) do
+            local passenger = getVehicleOccupant(vehicle, i)
+            if passenger then
+                passengers[i] = passenger
+            end
+        end
+        
+        -- Save element data
+        local allData = {}
+        for key, value in pairs(getAllElementData(vehicle)) do
+            allData[key] = value
+        end
+        
+        -- Store original model for restoration
+        if not vehicleOriginalModels[vehicle] then
+            vehicleOriginalModels[vehicle] = originalModel
+        end
+        
+        -- Create new vehicle with original model
+        -- Note: createVehicle cannot use custom ID on server side
+        -- We'll use original model and replace DFF on clients (affects all vehicles of this type)
+        local newVehicle = createVehicle(originalModel, x, y, z, rx, ry, rz)
+        
+        if not newVehicle then
+            outputDebugString("[Vehicle Variants] ERROR: Failed to create vehicle with original model!")
+            return
+        end
+        
+        -- Load custom model for original model (this will affect all vehicles of this type)
+        -- But at least this specific vehicle will have the custom model
+        triggerClientEvent(root, "loadCustomModelVariant", resourceRoot, 
+            customModelID, dffPath, txdPath, newVehicle, originalModel)
+        
+        -- Restore all properties
+        setElementHealth(newVehicle, health)
+        setVehicleColor(newVehicle, color1, color2, color3, color4)
+        if paintjob then
+            setVehiclePaintjob(newVehicle, paintjob)
+        end
+        setVehiclePlateText(newVehicle, plateText)
+        setVehicleLocked(newVehicle, locked)
+        setVehicleEngineState(newVehicle, engineState)
+        -- Note: Lights state is not saved/restored (getVehicleLightState requires light ID)
+        
+        for i = 0, 5 do
+            if doorStates[i] then
+                setVehicleDoorState(newVehicle, i, doorStates[i])
+            end
+        end
+        
+        for i = 0, 3 do
+            if wheelStates[i] then
+                setVehicleWheelStates(newVehicle, i, wheelStates[i])
+            end
+        end
+        
+        for i = 0, 6 do
+            if panelStates[i] then
+                setVehiclePanelState(newVehicle, i, panelStates[i])
+            end
+        end
+        
+        -- Restore element data
+        for key, value in pairs(allData) do
+            setElementData(newVehicle, key, value)
+        end
+        
+        -- Store original model for new vehicle
+        vehicleOriginalModels[newVehicle] = originalModel
+        
+        -- Restore occupants
+        if driver then
+            warpPedIntoVehicle(driver, newVehicle, 0)
+        end
+        for seat, passenger in pairs(passengers) do
+            if seat > 0 then
+                warpPedIntoVehicle(passenger, newVehicle, seat)
+            end
+        end
+        
+        -- Destroy old vehicle
+        destroyElement(vehicle)
+        
+        outputDebugString("[Vehicle Variants] Vehicle replaced successfully with model " .. getElementModel(newVehicle))
+    end, 500, 1) -- Wait 500ms for model to load on clients
     
-    return true, "Pojazd zamieniony na custom model", newVehicle
+    return true, "Pojazd zamieniany na custom model..."
 end
 
 -- Function to apply custom model variant by replacing vehicle
