@@ -35,9 +35,6 @@ local customModelVariants = {
 -- Store original models for vehicles (to restore when variant = 0)
 local vehicleOriginalModels = {}
 
--- Store loaded custom models to avoid reloading
-local loadedCustomModels = {}
-
 -- Helper function to check if player is admin
 function isPlayerAdmin(player)
     if not isElement(player) or getElementType(player) ~= "player" then
@@ -50,45 +47,7 @@ function isPlayerAdmin(player)
     return isObjectInACLGroup("user." .. getAccountName(account), aclGetGroup(ADMIN_ACL))
 end
 
--- Function to load custom model using EngineFreeModel
-function loadCustomModel(customID, dffPath, txdPath)
-    -- Check if already loaded
-    if loadedCustomModels[customID] then
-        return true, "Model już załadowany"
-    end
-    
-    -- Free model ID
-    if not engineFreeModel(customID) then
-        return false, "Nie udało się zwolnić modelu ID: " .. customID
-    end
-    
-    -- Load TXD file first (if provided)
-    if txdPath then
-        local txd = engineLoadTXD(txdPath, true)
-        if not txd then
-            return false, "Nie udało się załadować TXD: " .. txdPath
-        end
-        if not engineImportTXD(txd, customID) then
-            return false, "Nie udało się zaimportować TXD dla modelu: " .. customID
-        end
-    end
-    
-    -- Load DFF file
-    if dffPath then
-        local dff = engineLoadDFF(dffPath, customID)
-        if not dff then
-            return false, "Nie udało się załadować DFF: " .. dffPath
-        end
-        if not engineReplaceModel(dff, customID) then
-            return false, "Nie udało się zastąpić modelu DFF"
-        end
-    end
-    
-    loadedCustomModels[customID] = true
-    return true, "Custom model załadowany pomyślnie"
-end
-
--- Function to apply custom model variant to vehicle
+-- Function to apply custom model variant to vehicle (sends request to client)
 function applyCustomModelVariant(vehicle, originalModel, variant1)
     -- Check if there's a custom model for this variant
     if not customModelVariants[originalModel] or not customModelVariants[originalModel][variant1] then
@@ -102,32 +61,46 @@ function applyCustomModelVariant(vehicle, originalModel, variant1)
         vehicleOriginalModels[vehicle] = originalModel
     end
     
-    -- Load custom model if not already loaded (this also replaces the model)
-    local success, message = loadCustomModel(customModelData.customID, customModelData.dff, customModelData.txd)
-    if not success then
-        return false, message
-    end
+    -- Send request to all clients to load the custom model
+    triggerClientEvent(root, "loadCustomModelVariant", resourceRoot, 
+        customModelData.customID, 
+        customModelData.dff, 
+        customModelData.txd, 
+        vehicle
+    )
     
-    -- Set vehicle model to custom ID
-    setElementModel(vehicle, customModelData.customID)
-    
-    return true, "Custom model zastosowany"
+    return true, "Custom model ładowany..."
 end
 
--- Function to restore original model
+-- Handle confirmation from client that model was loaded
+addEvent("onCustomModelLoaded", true)
+addEventHandler("onCustomModelLoaded", root, function(vehicle, customID, success, message)
+    if success then
+        outputDebugString("[Vehicle Variants] Custom model " .. customID .. " loaded successfully")
+    else
+        outputDebugString("[Vehicle Variants] Failed to load custom model " .. customID .. ": " .. tostring(message))
+    end
+end)
+
+-- Function to restore original model (sends request to client)
 function restoreOriginalModel(vehicle)
     if not vehicleOriginalModels[vehicle] then
         return false, "Brak zapisanego oryginalnego modelu"
     end
     
     local originalModel = vehicleOriginalModels[vehicle]
-    setElementModel(vehicle, originalModel)
     
-    -- Optionally restore model (if needed)
-    -- engineRestoreModel(originalModel)
+    -- Send request to all clients to restore original model
+    triggerClientEvent(root, "restoreOriginalModelVariant", resourceRoot, vehicle, originalModel)
     
-    return true, "Przywrócono oryginalny model"
+    return true, "Przywracanie oryginalnego modelu..."
 end
+
+-- Handle confirmation from client that original model was restored
+addEvent("onOriginalModelRestored", true)
+addEventHandler("onOriginalModelRestored", root, function(vehicle, originalModel)
+    outputDebugString("[Vehicle Variants] Original model " .. originalModel .. " restored for vehicle")
+end)
 
 -- Function to set vehicle variant
 function setVehicleVariantSafe(vehicle, variant1, variant2)

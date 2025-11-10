@@ -2,7 +2,5 @@
     <info author="Piorun" version="1.0" name="Vehicle Variants" description="Script do zarządzania wariantami pojazdów w MTA:SA" type="script" />
     
     <script src="vehicle_variants.lua" type="server" />
-    
-    <!-- Optional: Add client-side script if needed -->
-    <!-- <script src="vehicle_variants_client.lua" type="client" /> -->
+    <script src="vehicle_variants_client.lua" type="client" />
 </meta>
