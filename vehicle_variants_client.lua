@@ -38,29 +38,44 @@ function loadCustomModel(customID, dffPath, txdPath, originalModel)
     
     -- Load DFF file
     if dffPath then
-        -- First try loading DFF with custom ID
-        local dff = engineLoadDFF(dffPath, customID)
+        outputDebugString("[Vehicle Variants Client] Attempting to load DFF: " .. dffPath)
+        
+        -- Try loading DFF with original model ID first (more reliable)
+        local dff = engineLoadDFF(dffPath, originalModel)
         local replaced = false
         
         if dff then
-            -- Try to replace model with custom ID
-            replaced = engineReplaceModel(dff, customID)
+            outputDebugString("[Vehicle Variants Client] DFF loaded successfully, attempting to replace model " .. originalModel)
+            -- Try to replace original model directly
+            replaced = engineReplaceModel(dff, originalModel)
+            if replaced then
+                outputDebugString("[Vehicle Variants Client] Successfully replaced model " .. originalModel)
+                customID = originalModel
+            else
+                outputDebugString("[Vehicle Variants Client] Failed to replace model " .. originalModel .. ", trying custom ID " .. customID)
+            end
+        else
+            outputDebugString("[Vehicle Variants Client] Failed to load DFF with original model ID, trying custom ID")
         end
         
-        -- If that fails, try with original model ID
+        -- If that fails, try with custom ID
         if not replaced then
-            dff = engineLoadDFF(dffPath, originalModel)
+            dff = engineLoadDFF(dffPath, customID)
             if dff then
-                replaced = engineReplaceModel(dff, originalModel)
+                outputDebugString("[Vehicle Variants Client] DFF loaded with custom ID, attempting to replace model " .. customID)
+                replaced = engineReplaceModel(dff, customID)
                 if replaced then
-                    -- If we replaced original model, we'll use original model ID
-                    customID = originalModel
+                    outputDebugString("[Vehicle Variants Client] Successfully replaced model " .. customID)
+                else
+                    outputDebugString("[Vehicle Variants Client] Failed to replace model " .. customID)
                 end
+            else
+                outputDebugString("[Vehicle Variants Client] Failed to load DFF with custom ID " .. customID)
             end
         end
         
         if not replaced then
-            return false, "Nie udało się zastąpić modelu DFF"
+            return false, "Nie udało się zastąpić modelu DFF - sprawdź czy plik istnieje i jest poprawny"
         end
     end
     
