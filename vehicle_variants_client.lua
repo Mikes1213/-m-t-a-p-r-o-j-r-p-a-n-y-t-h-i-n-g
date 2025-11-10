@@ -38,6 +38,7 @@ function loadCustomModel(customID, dffPath, txdPath, originalModel)
     
     -- Load DFF file
     if dffPath then
+        outputChatBox("[DEBUG] Attempting to load DFF: " .. dffPath, 255, 255, 0)
         outputDebugString("[Vehicle Variants Client] Attempting to load DFF: " .. dffPath)
         
         -- Try loading DFF with original model ID first (more reliable)
@@ -45,37 +46,46 @@ function loadCustomModel(customID, dffPath, txdPath, originalModel)
         local replaced = false
         
         if dff then
+            outputChatBox("[DEBUG] DFF loaded! Trying to replace model " .. originalModel, 255, 255, 0)
             outputDebugString("[Vehicle Variants Client] DFF loaded successfully, attempting to replace model " .. originalModel)
             -- Try to replace original model directly
             replaced = engineReplaceModel(dff, originalModel)
             if replaced then
+                outputChatBox("[SUCCESS] Model " .. originalModel .. " replaced!", 0, 255, 0)
                 outputDebugString("[Vehicle Variants Client] Successfully replaced model " .. originalModel)
                 customID = originalModel
             else
+                outputChatBox("[WARNING] Failed to replace model " .. originalModel .. ", trying custom ID", 255, 165, 0)
                 outputDebugString("[Vehicle Variants Client] Failed to replace model " .. originalModel .. ", trying custom ID " .. customID)
             end
         else
+            outputChatBox("[WARNING] Failed to load DFF with model " .. originalModel .. " - file may not exist or be corrupted", 255, 165, 0)
             outputDebugString("[Vehicle Variants Client] Failed to load DFF with original model ID, trying custom ID")
         end
         
         -- If that fails, try with custom ID
         if not replaced then
+            outputChatBox("[DEBUG] Trying custom ID " .. customID, 255, 255, 0)
             dff = engineLoadDFF(dffPath, customID)
             if dff then
+                outputChatBox("[DEBUG] DFF loaded with custom ID! Trying to replace...", 255, 255, 0)
                 outputDebugString("[Vehicle Variants Client] DFF loaded with custom ID, attempting to replace model " .. customID)
                 replaced = engineReplaceModel(dff, customID)
                 if replaced then
+                    outputChatBox("[SUCCESS] Model " .. customID .. " replaced!", 0, 255, 0)
                     outputDebugString("[Vehicle Variants Client] Successfully replaced model " .. customID)
                 else
+                    outputChatBox("[ERROR] Failed to replace model " .. customID, 255, 0, 0)
                     outputDebugString("[Vehicle Variants Client] Failed to replace model " .. customID)
                 end
             else
+                outputChatBox("[ERROR] Failed to load DFF with custom ID " .. customID .. " - file may not exist: " .. dffPath, 255, 0, 0)
                 outputDebugString("[Vehicle Variants Client] Failed to load DFF with custom ID " .. customID)
             end
         end
         
         if not replaced then
-            return false, "Nie udało się zastąpić modelu DFF - sprawdź czy plik istnieje i jest poprawny"
+            return false, "Nie udało się zastąpić modelu DFF - sprawdź czy plik istnieje: " .. dffPath
         end
     end
     
@@ -86,13 +96,17 @@ end
 -- Receive custom model data from server and load it
 addEvent("loadCustomModelVariant", true)
 addEventHandler("loadCustomModelVariant", root, function(customID, dffPath, txdPath, vehicle, originalModel)
+    outputChatBox("[DEBUG] Event received! customID=" .. tostring(customID) .. ", dffPath=" .. tostring(dffPath), 255, 255, 0)
+    
     if not customID or not dffPath or not vehicle or not originalModel then
+        outputChatBox("[ERROR] Missing parameters!", 255, 0, 0)
         outputDebugString("[Vehicle Variants Client] Missing parameters: customID=" .. tostring(customID) .. ", dffPath=" .. tostring(dffPath) .. ", vehicle=" .. tostring(vehicle) .. ", originalModel=" .. tostring(originalModel))
         return
     end
     
     -- Ensure paths are relative to resource (add :resourceName if needed)
     local resourceName = getResourceName(getThisResource())
+    outputChatBox("[DEBUG] Resource name: " .. resourceName, 255, 255, 0)
     outputDebugString("[Vehicle Variants Client] Resource name: " .. resourceName)
     
     if not string.find(dffPath, ":") then
@@ -102,6 +116,7 @@ addEventHandler("loadCustomModelVariant", root, function(customID, dffPath, txdP
         txdPath = ":" .. resourceName .. "/" .. txdPath
     end
     
+    outputChatBox("[DEBUG] Final paths - DFF: " .. dffPath .. ", TXD: " .. tostring(txdPath), 255, 255, 0)
     outputDebugString("[Vehicle Variants Client] Loading model - DFF: " .. dffPath .. ", TXD: " .. tostring(txdPath) .. ", CustomID: " .. customID .. ", OriginalModel: " .. originalModel)
     
     -- Load the custom model
@@ -111,12 +126,14 @@ addEventHandler("loadCustomModelVariant", root, function(customID, dffPath, txdP
         -- Use the final model ID (may be customID or originalModel if replacement failed)
         finalModelID = finalModelID or customID
         
+        outputChatBox("[SUCCESS] Model loaded! Setting vehicle to model: " .. finalModelID, 0, 255, 0)
         outputDebugString("[Vehicle Variants Client] Model loaded successfully, setting vehicle model to: " .. finalModelID)
         
         -- Set vehicle model to the final model ID
         setElementModel(vehicle, finalModelID)
         triggerServerEvent("onCustomModelLoaded", resourceRoot, vehicle, finalModelID, true, message)
     else
+        outputChatBox("[ERROR] Failed: " .. tostring(message), 255, 0, 0)
         outputDebugString("[Vehicle Variants Client] Failed to load model: " .. tostring(message))
         triggerServerEvent("onCustomModelLoaded", resourceRoot, vehicle, customID, false, message)
     end
