@@ -7,12 +7,29 @@
     - Spoilers
     - Hoods
     - Roofs
+    - Custom models (DFF/TXD) using EngineFreeModel
     - etc.
 ]]
 
 -- Configuration
 local ADMIN_ACL = "Admin" -- ACL group that can use admin commands
 local ENABLE_PLAYER_COMMANDS = true -- Allow players to use /setvariant command
+
+-- Custom model variants configuration
+-- Format: [originalModel] = { [variant1] = { customID = number, dff = "path/to/model.dff", txd = "path/to/model.txd" } }
+local customModelVariants = {
+    -- Przykład: Sultan (560) z custom modelem bez dachu
+    -- [560] = {
+    --     [1] = { customID = 18000, dff = "models/sultan_nodach.dff", txd = "models/sultan_nodach.txd" },
+    --     [2] = { customID = 18001, dff = "models/sultan_tuning.dff", txd = "models/sultan_tuning.txd" }
+    -- }
+}
+
+-- Store original models for vehicles (to restore when variant = 0)
+local vehicleOriginalModels = {}
+
+-- Store loaded custom models to avoid reloading
+local loadedCustomModels = {}
 
 -- Helper function to check if player is admin
 function isPlayerAdmin(player)
@@ -24,6 +41,85 @@ function isPlayerAdmin(player)
         return false
     end
     return isObjectInACLGroup("user." .. getAccountName(account), aclGetGroup(ADMIN_ACL))
+end
+
+-- Function to load custom model using EngineFreeModel
+function loadCustomModel(customID, dffPath, txdPath)
+    -- Check if already loaded
+    if loadedCustomModels[customID] then
+        return true, "Model już załadowany"
+    end
+    
+    -- Free model ID
+    if not engineFreeModel(customID) then
+        return false, "Nie udało się zwolnić modelu ID: " .. customID
+    end
+    
+    -- Load TXD file first (if provided)
+    if txdPath then
+        local txd = engineLoadTXD(txdPath, true)
+        if not txd then
+            return false, "Nie udało się załadować TXD: " .. txdPath
+        end
+        if not engineImportTXD(txd, customID) then
+            return false, "Nie udało się zaimportować TXD dla modelu: " .. customID
+        end
+    end
+    
+    -- Load DFF file
+    if dffPath then
+        local dff = engineLoadDFF(dffPath, customID)
+        if not dff then
+            return false, "Nie udało się załadować DFF: " .. dffPath
+        end
+        if not engineReplaceModel(dff, customID) then
+            return false, "Nie udało się zastąpić modelu DFF"
+        end
+    end
+    
+    loadedCustomModels[customID] = true
+    return true, "Custom model załadowany pomyślnie"
+end
+
+-- Function to apply custom model variant to vehicle
+function applyCustomModelVariant(vehicle, originalModel, variant1)
+    -- Check if there's a custom model for this variant
+    if not customModelVariants[originalModel] or not customModelVariants[originalModel][variant1] then
+        return false, "Brak custom modelu dla tego wariantu"
+    end
+    
+    local customModelData = customModelVariants[originalModel][variant1]
+    
+    -- Store original model if not stored yet
+    if not vehicleOriginalModels[vehicle] then
+        vehicleOriginalModels[vehicle] = originalModel
+    end
+    
+    -- Load custom model if not already loaded (this also replaces the model)
+    local success, message = loadCustomModel(customModelData.customID, customModelData.dff, customModelData.txd)
+    if not success then
+        return false, message
+    end
+    
+    -- Set vehicle model to custom ID
+    setElementModel(vehicle, customModelData.customID)
+    
+    return true, "Custom model zastosowany"
+end
+
+-- Function to restore original model
+function restoreOriginalModel(vehicle)
+    if not vehicleOriginalModels[vehicle] then
+        return false, "Brak zapisanego oryginalnego modelu"
+    end
+    
+    local originalModel = vehicleOriginalModels[vehicle]
+    setElementModel(vehicle, originalModel)
+    
+    -- Optionally restore model (if needed)
+    -- engineRestoreModel(originalModel)
+    
+    return true, "Przywrócono oryginalny model"
 end
 
 -- Function to set vehicle variant
@@ -44,7 +140,32 @@ function setVehicleVariantSafe(vehicle, variant1, variant2)
         return false, "Variant 2 must be between 0 and 255"
     end
     
-    -- Set the variant
+    -- Get current/original model
+    local currentModel = getElementModel(vehicle)
+    local originalModel = vehicleOriginalModels[vehicle] or currentModel
+    
+    -- If variant1 is 0, restore original model (if it was changed)
+    if variant1 == 0 then
+        if vehicleOriginalModels[vehicle] and currentModel ~= originalModel then
+            local success, message = restoreOriginalModel(vehicle)
+            if not success then
+                return false, message
+            end
+        end
+    else
+        -- Check if there's a custom model for this variant
+        if customModelVariants[originalModel] and customModelVariants[originalModel][variant1] then
+            local success, message = applyCustomModelVariant(vehicle, originalModel, variant1)
+            if not success then
+                return false, message
+            end
+            -- Still set the game variant (for compatibility)
+            setVehicleVariant(vehicle, variant1, variant2)
+            return true, "Custom model variant zastosowany"
+        end
+    end
+    
+    -- Set the standard variant (for vehicles without custom models)
     local success = setVehicleVariant(vehicle, variant1, variant2)
     
     if success then
@@ -191,5 +312,55 @@ addEventHandler("setVehicleVariantCustom", root, function(vehicle, variant1, var
         triggerClientEvent(client, "onVehicleVariantSet", resourceRoot, success, message)
     end
 end)
+
+-- Admin command to add custom model variant
+function addCustomVariantCommand(player, command, modelID, variant1, customID, dffPath, txdPath)
+    if not isPlayerAdmin(player) then
+        outputChatBox("Nie masz uprawnień do użycia tej komendy!", player, 255, 0, 0)
+        return
+    end
+    
+    modelID = tonumber(modelID)
+    variant1 = tonumber(variant1)
+    customID = tonumber(customID)
+    
+    if not modelID or not variant1 or not customID or not dffPath then
+        outputChatBox("Użycie: /addcustomvariant [modelID] [variant1] [customID] [ścieżka/do/model.dff] [ścieżka/do/model.txd]", player, 255, 255, 0)
+        outputChatBox("Przykład: /addcustomvariant 560 1 18000 models/sultan_nodach.dff models/sultan_nodach.txd", player, 255, 255, 0)
+        return
+    end
+    
+    -- Initialize table if needed
+    if not customModelVariants[modelID] then
+        customModelVariants[modelID] = {}
+    end
+    
+    -- Add custom variant
+    customModelVariants[modelID][variant1] = {
+        customID = customID,
+        dff = dffPath,
+        txd = txdPath or nil
+    }
+    
+    outputChatBox("Dodano custom wariant: Model " .. modelID .. ", Wariant " .. variant1 .. " -> Custom ID " .. customID, player, 0, 255, 0)
+    outputDebugString("[Vehicle Variants] Added custom variant: Model " .. modelID .. ", Variant " .. variant1 .. " -> Custom ID " .. customID)
+end
+
+addCommandHandler("addcustomvariant", addCustomVariantCommand)
+
+-- Clean up when vehicle is destroyed
+addEventHandler("onElementDestroy", root, function()
+    if getElementType(source) == "vehicle" then
+        vehicleOriginalModels[source] = nil
+    end
+end)
+
+-- Function to get custom variant info
+function getCustomVariantInfo(modelID, variant1)
+    if customModelVariants[modelID] and customModelVariants[modelID][variant1] then
+        return customModelVariants[modelID][variant1]
+    end
+    return nil
+end
 
 outputDebugString("[Vehicle Variants] Script loaded successfully!")
