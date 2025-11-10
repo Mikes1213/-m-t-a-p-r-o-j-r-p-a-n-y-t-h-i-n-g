@@ -149,11 +149,23 @@ addEventHandler("loadCustomModelVariant", root, function(customID, dffPath, txdP
         -- Use the final model ID (may be customID or originalModel if replacement failed)
         finalModelID = finalModelID or customID
         
-        outputChatBox("[SUCCESS] Model loaded! Setting vehicle to model: " .. finalModelID, 0, 255, 0)
+        outputChatBox("[SUCCESS] Model loaded! Final Model ID: " .. finalModelID, 0, 255, 0)
+        outputChatBox("[DEBUG] Current vehicle model before change: " .. getElementModel(vehicle), 255, 255, 0)
         outputDebugString("[Vehicle Variants Client] Model loaded successfully, setting vehicle model to: " .. finalModelID)
         
         -- Set vehicle model to the final model ID
-        setElementModel(vehicle, finalModelID)
+        local modelSet = setElementModel(vehicle, finalModelID)
+        local newModel = getElementModel(vehicle)
+        
+        outputChatBox("[DEBUG] setElementModel result: " .. tostring(modelSet), 255, 255, 0)
+        outputChatBox("[DEBUG] Vehicle model after change: " .. newModel, 255, 255, 0)
+        
+        if newModel == finalModelID then
+            outputChatBox("[SUCCESS] Vehicle model changed successfully!", 0, 255, 0)
+        else
+            outputChatBox("[ERROR] Vehicle model mismatch! Expected: " .. finalModelID .. ", Got: " .. newModel, 255, 0, 0)
+        end
+        
         triggerServerEvent("onCustomModelLoaded", resourceRoot, vehicle, finalModelID, true, message)
     else
         outputChatBox("[ERROR] Failed: " .. tostring(message), 255, 0, 0)
