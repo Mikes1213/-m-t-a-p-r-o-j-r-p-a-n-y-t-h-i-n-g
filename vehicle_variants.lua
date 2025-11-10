@@ -18,10 +18,17 @@ local ENABLE_PLAYER_COMMANDS = true -- Allow players to use /setvariant command
 -- Custom model variants configuration
 -- Format: [originalModel] = { [variant1] = { customID = number, dff = "path/to/model.dff", txd = "path/to/model.txd" } }
 local customModelVariants = {
-    -- Przykład: Sultan (560) z custom modelem bez dachu
-    -- [560] = {
-    --     [1] = { customID = 18000, dff = "models/sultan_nodach.dff", txd = "models/sultan_nodach.txd" },
-    --     [2] = { customID = 18001, dff = "models/sultan_tuning.dff", txd = "models/sultan_tuning.txd" }
+    -- Sultan (560) z custom modelem bez dachu
+    [560] = {
+        [1] = { 
+            customID = 18000, 
+            dff = "models/sulotan_nodach.dff", 
+            txd = "models/sulotan_nodach.txd" 
+        }
+    }
+    -- Możesz dodać więcej pojazdów tutaj:
+    -- [411] = {  -- Infernus
+    --     [1] = { customID = 18001, dff = "models/infernus_custom.dff", txd = "models/infernus_custom.txd" }
     -- }
 }
 
