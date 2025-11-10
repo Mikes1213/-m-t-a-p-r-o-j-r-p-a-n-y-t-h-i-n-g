@@ -66,7 +66,8 @@ function applyCustomModelVariant(vehicle, originalModel, variant1)
         customModelData.customID, 
         customModelData.dff, 
         customModelData.txd, 
-        vehicle
+        vehicle,
+        originalModel
     )
     
     return true, "Custom model ładowany..."
