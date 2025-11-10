@@ -77,27 +77,10 @@ end
 addEvent("onCustomModelLoaded", true)
 addEventHandler("onCustomModelLoaded", root, function(vehicle, finalModelID, success, message)
     if success and isElement(vehicle) then
-        outputDebugString("[Vehicle Variants] Custom model " .. finalModelID .. " loaded successfully")
-        
-        -- Wait a bit for model to be fully loaded, then change vehicle model on server side
-        setTimer(function()
-            if isElement(vehicle) then
-                local currentModel = getElementModel(vehicle)
-                outputDebugString("[Vehicle Variants] Changing vehicle model from " .. currentModel .. " to " .. finalModelID)
-                
-                -- Change vehicle model on server side (this syncs to all clients)
-                local modelChanged = setElementModel(vehicle, finalModelID)
-                local newModel = getElementModel(vehicle)
-                
-                outputDebugString("[Vehicle Variants] setElementModel result: " .. tostring(modelChanged) .. ", new model: " .. newModel)
-                
-                if newModel == finalModelID then
-                    outputDebugString("[Vehicle Variants] Vehicle model successfully changed to " .. finalModelID)
-                else
-                    outputDebugString("[Vehicle Variants] WARNING: Vehicle model change failed! Expected " .. finalModelID .. ", got " .. newModel)
-                end
-            end
-        end, 100, 1) -- Wait 100ms before changing model
+        outputDebugString("[Vehicle Variants] Custom model loaded successfully")
+        -- Note: Vehicle model is not changed - it stays as original model (560)
+        -- The model DFF was replaced using engineReplaceModel, so all vehicles of this type now use the custom model
+        -- When variant is set to 0, we'll restore the original model
     else
         outputDebugString("[Vehicle Variants] Failed to load custom model: " .. tostring(message))
     end
