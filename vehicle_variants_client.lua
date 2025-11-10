@@ -20,18 +20,19 @@ function loadCustomModel(customID, dffPath, txdPath, originalModel)
     -- Load TXD file first (if provided)
     if txdPath then
         local txd = engineLoadTXD(txdPath, true)
-        if not txd then
-            return false, "Nie udało się załadować TXD: " .. txdPath
-        end
-        
-        -- Try importing to custom ID first
-        local txdImported = engineImportTXD(txd, customID)
-        if not txdImported then
-            -- If custom ID fails, try original model
-            txdImported = engineImportTXD(txd, originalModel)
+        if txd then
+            -- Try importing to custom ID first
+            local txdImported = engineImportTXD(txd, customID)
             if not txdImported then
-                return false, "Nie udało się zaimportować TXD"
+                -- If custom ID fails, try original model
+                txdImported = engineImportTXD(txd, originalModel)
+                if not txdImported then
+                    outputDebugString("[Vehicle Variants Client] Warning: Failed to import TXD, continuing without it")
+                end
             end
+        else
+            -- TXD loading failed, but we can continue without it
+            outputDebugString("[Vehicle Variants Client] Warning: Failed to load TXD file: " .. txdPath .. ", continuing without it")
         end
     end
     
@@ -77,6 +78,8 @@ addEventHandler("loadCustomModelVariant", root, function(customID, dffPath, txdP
     
     -- Ensure paths are relative to resource (add :resourceName if needed)
     local resourceName = getResourceName(getThisResource())
+    outputDebugString("[Vehicle Variants Client] Resource name: " .. resourceName)
+    
     if not string.find(dffPath, ":") then
         dffPath = ":" .. resourceName .. "/" .. dffPath
     end
@@ -84,12 +87,16 @@ addEventHandler("loadCustomModelVariant", root, function(customID, dffPath, txdP
         txdPath = ":" .. resourceName .. "/" .. txdPath
     end
     
+    outputDebugString("[Vehicle Variants Client] Loading model - DFF: " .. dffPath .. ", TXD: " .. tostring(txdPath) .. ", CustomID: " .. customID .. ", OriginalModel: " .. originalModel)
+    
     -- Load the custom model
     local success, message, finalModelID = loadCustomModel(customID, dffPath, txdPath, originalModel)
     
     if success and isElement(vehicle) then
         -- Use the final model ID (may be customID or originalModel if replacement failed)
         finalModelID = finalModelID or customID
+        
+        outputDebugString("[Vehicle Variants Client] Model loaded successfully, setting vehicle model to: " .. finalModelID)
         
         -- Set vehicle model to the final model ID
         setElementModel(vehicle, finalModelID)
