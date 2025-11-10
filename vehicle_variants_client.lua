@@ -9,32 +9,49 @@ local loadedCustomModels = {}
 
 -- Function to load custom model and replace original model (client-side only)
 function loadCustomModel(customID, dffPath, txdPath, originalModel)
+    outputChatBox("[DEBUG] loadCustomModel called", 255, 255, 0)
+    
     -- Create unique key for this model variant
     local modelKey = originalModel .. "_" .. customID
     
     -- Check if already loaded
     if loadedCustomModels[modelKey] then
+        outputChatBox("[INFO] Model already loaded", 0, 255, 255)
         return true, "Model już załadowany", customID
     end
     
+    outputChatBox("[DEBUG] Loading TXD first...", 255, 255, 0)
+    
     -- Load TXD file first (if provided)
     if txdPath then
+        outputChatBox("[DEBUG] TXD path: " .. txdPath, 255, 255, 0)
         local txd = engineLoadTXD(txdPath, true)
         if txd then
+            outputChatBox("[DEBUG] TXD loaded, importing...", 255, 255, 0)
             -- Try importing to custom ID first
             local txdImported = engineImportTXD(txd, customID)
             if not txdImported then
                 -- If custom ID fails, try original model
                 txdImported = engineImportTXD(txd, originalModel)
                 if not txdImported then
+                    outputChatBox("[WARNING] Failed to import TXD, continuing without it", 255, 165, 0)
                     outputDebugString("[Vehicle Variants Client] Warning: Failed to import TXD, continuing without it")
+                else
+                    outputChatBox("[SUCCESS] TXD imported to model " .. originalModel, 0, 255, 0)
                 end
+            else
+                outputChatBox("[SUCCESS] TXD imported to model " .. customID, 0, 255, 0)
             end
         else
             -- TXD loading failed, but we can continue without it
+            outputChatBox("[WARNING] Failed to load TXD file: " .. txdPath .. ", continuing without it", 255, 165, 0)
             outputDebugString("[Vehicle Variants Client] Warning: Failed to load TXD file: " .. txdPath .. ", continuing without it")
         end
+    else
+        outputChatBox("[INFO] No TXD file provided", 255, 255, 0)
     end
+    
+    outputChatBox("[DEBUG] Now loading DFF...", 255, 255, 0)
     
     -- Load DFF file
     if dffPath then
