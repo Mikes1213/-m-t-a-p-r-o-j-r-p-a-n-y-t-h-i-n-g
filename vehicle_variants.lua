@@ -63,17 +63,29 @@ function applyCustomModelVariant(vehicle, originalModel, variant1)
     
     -- Generate unique custom ID for this specific vehicle using element ID
     -- Base custom ID + vehicle element ID = unique ID per vehicle
-    local vehicleIDStr = getElementID(vehicle) or getElementData(vehicle, "vehicleID") or "0"
-    local vehicleID = tonumber(vehicleIDStr) or 0
-    local uniqueCustomID = customModelData.customID + vehicleID
+    local vehicleID = 0
     
-    -- If vehicle doesn't have ID, use a hash of the vehicle element
-    if vehicleID == 0 then
-        -- Use a simple hash based on vehicle pointer/memory address
-        -- This creates a unique ID for each vehicle instance
-        local vehiclePointer = tostring(vehicle):match("%d+")
-        uniqueCustomID = customModelData.customID + (tonumber(vehiclePointer) or 0) % 1000
+    -- Try to get element ID (may return string or nil)
+    local elementID = getElementID(vehicle)
+    if elementID then
+        vehicleID = tonumber(elementID) or 0
     end
+    
+    -- If no element ID, try element data
+    if vehicleID == 0 then
+        local vehicleIDData = getElementData(vehicle, "vehicleID")
+        if vehicleIDData then
+            vehicleID = tonumber(vehicleIDData) or 0
+        end
+    end
+    
+    -- If still no ID, use hash of vehicle element pointer
+    if vehicleID == 0 then
+        local vehiclePointer = tostring(vehicle):match("%d+")
+        vehicleID = (tonumber(vehiclePointer) or 0) % 1000
+    end
+    
+    local uniqueCustomID = customModelData.customID + vehicleID
     
     outputDebugString("[Vehicle Variants] Vehicle element ID: " .. vehicleID .. ", Unique custom ID: " .. uniqueCustomID)
     
