@@ -3,4 +3,8 @@
     
     <script src="vehicle_variants.lua" type="server" />
     <script src="vehicle_variants_client.lua" type="client" />
+    
+    <!-- Custom model files -->
+    <file src="models/sultan_nodach.dff" />
+    <file src="models/sultan_nodach.txd" />
 </meta>

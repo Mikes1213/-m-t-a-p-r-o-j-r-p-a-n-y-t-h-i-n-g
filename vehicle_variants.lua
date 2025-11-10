@@ -22,8 +22,8 @@ local customModelVariants = {
     [560] = {
         [1] = { 
             customID = 18000, 
-            dff = "models/sulotan_nodach.dff", 
-            txd = "models/sulotan_nodach.txd" 
+            dff = "models/sultan_nodach.dff", 
+            txd = "models/sultan_nodach.txd" 
         }
     }
     -- Możesz dodać więcej pojazdów tutaj:
