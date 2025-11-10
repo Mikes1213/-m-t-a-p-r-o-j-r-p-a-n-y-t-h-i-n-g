@@ -156,19 +156,9 @@ addEventHandler("loadCustomModelVariant", root, function(customID, dffPath, txdP
         outputChatBox("[DEBUG] Current vehicle model before change: " .. getElementModel(vehicle), 255, 255, 0)
         outputDebugString("[Vehicle Variants Client] Model loaded successfully, setting vehicle model to: " .. finalModelID)
         
-        -- Set vehicle model to the final model ID
-        local modelSet = setElementModel(vehicle, finalModelID)
-        local newModel = getElementModel(vehicle)
-        
-        outputChatBox("[DEBUG] setElementModel result: " .. tostring(modelSet), 255, 255, 0)
-        outputChatBox("[DEBUG] Vehicle model after change: " .. newModel, 255, 255, 0)
-        
-        if newModel == finalModelID then
-            outputChatBox("[SUCCESS] Vehicle model changed successfully!", 0, 255, 0)
-        else
-            outputChatBox("[ERROR] Vehicle model mismatch! Expected: " .. finalModelID .. ", Got: " .. newModel, 255, 0, 0)
-        end
-        
+        -- Don't try to change model on client side - server will do it
+        -- Client-side setElementModel doesn't work for custom vehicle IDs
+        -- Just notify server that model is loaded and ready
         triggerServerEvent("onCustomModelLoaded", resourceRoot, vehicle, finalModelID, true, message)
     else
         outputChatBox("[ERROR] Failed: " .. tostring(message), 255, 0, 0)
