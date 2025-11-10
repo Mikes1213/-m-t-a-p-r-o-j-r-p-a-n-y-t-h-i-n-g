@@ -28,10 +28,11 @@ function loadCustomModel(customID, dffPath, txdPath, originalModel)
         local txd = engineLoadTXD(txdPath, true)
         if txd then
             outputChatBox("[DEBUG] TXD loaded, importing...", 255, 255, 0)
-            -- Import TXD to original model (we use original model ID with replaced DFF)
-            local txdImported = engineImportTXD(txd, originalModel)
+            -- Import TXD to custom ID (if vehicle is created with custom ID) or original model
+            local targetModelID = (customID == originalModel) and customID or originalModel
+            local txdImported = engineImportTXD(txd, targetModelID)
             if txdImported then
-                outputChatBox("[SUCCESS] TXD imported to model " .. originalModel, 0, 255, 0)
+                outputChatBox("[SUCCESS] TXD imported to model " .. targetModelID, 0, 255, 0)
             else
                 outputChatBox("[WARNING] Failed to import TXD, continuing without it", 255, 165, 0)
                 outputDebugString("[Vehicle Variants Client] Warning: Failed to import TXD, continuing without it")
@@ -52,34 +53,35 @@ function loadCustomModel(customID, dffPath, txdPath, originalModel)
         outputChatBox("[DEBUG] Attempting to load DFF: " .. dffPath, 255, 255, 0)
         outputDebugString("[Vehicle Variants Client] Attempting to load DFF: " .. dffPath)
         
-        -- Try using unique custom ID for this specific vehicle
-        -- First, try to free and load model with custom ID
-        engineFreeModel(customID)
+        -- If vehicle is created with custom ID (customID == originalModel), use customID
+        -- Otherwise, try custom ID first, then fallback to original model
+        local targetModelID = customID -- Always try custom ID first
+        engineFreeModel(targetModelID)
         
-        local dff = engineLoadDFF(dffPath, customID)
+        local dff = engineLoadDFF(dffPath, targetModelID)
         local replaced = false
         
         if dff then
-            outputChatBox("[DEBUG] DFF loaded with custom ID " .. customID .. "! Trying to replace...", 255, 255, 0)
-            outputDebugString("[Vehicle Variants Client] DFF loaded with custom ID, attempting to replace model " .. customID)
-            -- Try to replace custom ID model
-            replaced = engineReplaceModel(dff, customID)
+            outputChatBox("[DEBUG] DFF loaded with ID " .. targetModelID .. "! Trying to replace...", 255, 255, 0)
+            outputDebugString("[Vehicle Variants Client] DFF loaded, attempting to replace model " .. targetModelID)
+            -- Replace model
+            replaced = engineReplaceModel(dff, targetModelID)
             if replaced then
-                outputChatBox("[SUCCESS] Custom model " .. customID .. " loaded!", 0, 255, 0)
-                outputDebugString("[Vehicle Variants Client] Successfully replaced model " .. customID)
-                -- Keep customID - we'll try to use it with setElementModel
+                outputChatBox("[SUCCESS] Model " .. targetModelID .. " loaded!", 0, 255, 0)
+                outputDebugString("[Vehicle Variants Client] Successfully replaced model " .. targetModelID)
+                customID = targetModelID -- Use the model ID we replaced
             else
-                outputChatBox("[WARNING] Failed to replace custom model, trying original model", 255, 165, 0)
-                outputDebugString("[Vehicle Variants Client] Failed to replace custom model, trying original")
+                outputChatBox("[WARNING] Failed to replace model " .. targetModelID, 255, 165, 0)
+                outputDebugString("[Vehicle Variants Client] Failed to replace model " .. targetModelID)
             end
         else
-            outputChatBox("[WARNING] Failed to load DFF with custom ID, trying original model", 255, 165, 0)
-            outputDebugString("[Vehicle Variants Client] Failed to load DFF with custom ID")
+            outputChatBox("[ERROR] Failed to load DFF with ID " .. targetModelID, 255, 0, 0)
+            outputDebugString("[Vehicle Variants Client] Failed to load DFF with ID " .. targetModelID)
         end
         
-        -- Fallback: Use original model if custom ID fails
-        if not replaced then
-            outputChatBox("[INFO] Using original model (will affect all vehicles of this type)", 255, 255, 0)
+        -- Fallback: Use original model if custom ID fails (only if not already using custom ID)
+        if not replaced and customID ~= originalModel then
+            outputChatBox("[INFO] Using original model as fallback (will affect all vehicles of this type)", 255, 255, 0)
             dff = engineLoadDFF(dffPath, originalModel)
             if dff then
                 replaced = engineReplaceModel(dff, originalModel)
@@ -146,15 +148,38 @@ addEventHandler("loadCustomModelVariant", root, function(customID, dffPath, txdP
     end
 end)
 
+-- Load custom model for vehicle created with custom ID
+addEvent("loadCustomModelForVehicle", true)
+addEventHandler("loadCustomModelForVehicle", root, function(customModelID, dffPath, txdPath)
+    if not customModelID or not dffPath then
+        return
+    end
+    
+    local resourceName = getResourceName(getThisResource())
+    if not string.find(dffPath, ":") then
+        dffPath = ":" .. resourceName .. "/" .. dffPath
+    end
+    if txdPath and not string.find(txdPath, ":") then
+        txdPath = ":" .. resourceName .. "/" .. txdPath
+    end
+    
+    -- Load custom model for this custom ID
+    -- When vehicle is created with custom ID, we load model for that ID
+    local success, message = loadCustomModel(customModelID, dffPath, txdPath, customModelID)
+    
+    if success then
+        outputDebugString("[Vehicle Variants Client] Custom model " .. customModelID .. " loaded for vehicle")
+    else
+        outputDebugString("[Vehicle Variants Client] Failed to load custom model " .. customModelID .. ": " .. tostring(message))
+    end
+end)
+
 -- Receive request to restore original model
 addEvent("restoreOriginalModelVariant", true)
-addEventHandler("restoreOriginalModelVariant", root, function(vehicle, originalModel)
-    if isElement(vehicle) and originalModel then
+addEventHandler("restoreOriginalModelVariant", root, function(originalModel)
+    if originalModel then
         -- Restore the original model DFF (this restores the model for all vehicles of this type)
         engineRestoreModel(originalModel)
-        
-        -- Vehicle already uses original model ID, no need to change it
-        -- Just restore the DFF and it will show the original model
         
         -- Clear loaded custom models for this original model so we can reload them later
         for modelKey, _ in pairs(loadedCustomModels) do
@@ -163,7 +188,7 @@ addEventHandler("restoreOriginalModelVariant", root, function(vehicle, originalM
             end
         end
         
-        triggerServerEvent("onOriginalModelRestored", resourceRoot, vehicle, originalModel)
+        outputDebugString("[Vehicle Variants Client] Original model " .. originalModel .. " restored")
     end
 end)
 

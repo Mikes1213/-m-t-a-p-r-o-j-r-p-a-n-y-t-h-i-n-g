@@ -47,7 +47,120 @@ function isPlayerAdmin(player)
     return isObjectInACLGroup("user." .. getAccountName(account), aclGetGroup(ADMIN_ACL))
 end
 
--- Function to apply custom model variant to vehicle (sends request to client)
+-- Function to replace vehicle with custom ID vehicle
+function replaceVehicleWithCustomModel(vehicle, customModelID, dffPath, txdPath, originalModel)
+    if not isElement(vehicle) or getElementType(vehicle) ~= "vehicle" then
+        return false, "Invalid vehicle"
+    end
+    
+    -- Save all vehicle properties
+    local x, y, z = getElementPosition(vehicle)
+    local rx, ry, rz = getElementRotation(vehicle)
+    local health = getElementHealth(vehicle)
+    local color1, color2, color3, color4 = getVehicleColor(vehicle)
+    local paintjob = getVehiclePaintjob(vehicle)
+    local plateText = getVehiclePlateText(vehicle)
+    local locked = isVehicleLocked(vehicle)
+    local engineState = getVehicleEngineState(vehicle)
+    local lightsState = getVehicleLightState(vehicle)
+    local doorStates = {}
+    for i = 0, 5 do
+        doorStates[i] = getVehicleDoorState(vehicle, i)
+    end
+    local wheelStates = {}
+    for i = 0, 3 do
+        wheelStates[i] = getVehicleWheelStates(vehicle, i)
+    end
+    local panelStates = {}
+    for i = 0, 6 do
+        panelStates[i] = getVehiclePanelState(vehicle, i)
+    end
+    
+    -- Save vehicle occupants
+    local driver = getVehicleController(vehicle)
+    local passengers = {}
+    for i = 0, getVehicleMaxPassengers(vehicle) do
+        local passenger = getVehicleOccupant(vehicle, i)
+        if passenger then
+            passengers[i] = passenger
+        end
+    end
+    
+    -- Save element data
+    local allData = {}
+    for key, value in pairs(getAllElementData(vehicle)) do
+        allData[key] = value
+    end
+    
+    -- Store original model for restoration
+    if not vehicleOriginalModels[vehicle] then
+        vehicleOriginalModels[vehicle] = originalModel
+    end
+    
+    -- Create new vehicle with custom model ID
+    local newVehicle = createVehicle(customModelID, x, y, z, rx, ry, rz)
+    
+    if not newVehicle then
+        return false, "Nie udało się stworzyć pojazdu z custom ID: " .. customModelID
+    end
+    
+    -- Restore all properties
+    setElementHealth(newVehicle, health)
+    setVehicleColor(newVehicle, color1, color2, color3, color4)
+    if paintjob then
+        setVehiclePaintjob(newVehicle, paintjob)
+    end
+    setVehiclePlateText(newVehicle, plateText)
+    setVehicleLocked(newVehicle, locked)
+    setVehicleEngineState(newVehicle, engineState)
+    setVehicleLightState(newVehicle, lightsState)
+    
+    for i = 0, 5 do
+        if doorStates[i] then
+            setVehicleDoorState(newVehicle, i, doorStates[i])
+        end
+    end
+    
+    for i = 0, 3 do
+        if wheelStates[i] then
+            setVehicleWheelStates(newVehicle, i, wheelStates[i])
+        end
+    end
+    
+    for i = 0, 6 do
+        if panelStates[i] then
+            setVehiclePanelState(newVehicle, i, panelStates[i])
+        end
+    end
+    
+    -- Restore element data
+    for key, value in pairs(allData) do
+        setElementData(newVehicle, key, value)
+    end
+    
+    -- Store original model for new vehicle
+    vehicleOriginalModels[newVehicle] = originalModel
+    
+    -- Restore occupants
+    if driver then
+        warpPedIntoVehicle(driver, newVehicle, 0)
+    end
+    for seat, passenger in pairs(passengers) do
+        if seat > 0 then
+            warpPedIntoVehicle(passenger, newVehicle, seat)
+        end
+    end
+    
+    -- Load custom model on all clients
+    triggerClientEvent(root, "loadCustomModelForVehicle", resourceRoot, customModelID, dffPath, txdPath)
+    
+    -- Destroy old vehicle
+    destroyElement(vehicle)
+    
+    return true, "Pojazd zamieniony na custom model", newVehicle
+end
+
+-- Function to apply custom model variant by replacing vehicle
 function applyCustomModelVariant(vehicle, originalModel, variant1)
     -- Check if there's a custom model for this variant
     if not customModelVariants[originalModel] or not customModelVariants[originalModel][variant1] then
@@ -56,22 +169,13 @@ function applyCustomModelVariant(vehicle, originalModel, variant1)
     
     local customModelData = customModelVariants[originalModel][variant1]
     
-    -- Store original model if not stored yet
-    if not vehicleOriginalModels[vehicle] then
-        vehicleOriginalModels[vehicle] = originalModel
-    end
-    
     -- Generate unique custom ID for this specific vehicle using element ID
-    -- Base custom ID + vehicle element ID = unique ID per vehicle
     local vehicleID = 0
-    
-    -- Try to get element ID (may return string or nil)
     local elementID = getElementID(vehicle)
     if elementID then
         vehicleID = tonumber(elementID) or 0
     end
     
-    -- If no element ID, try element data
     if vehicleID == 0 then
         local vehicleIDData = getElementData(vehicle, "vehicleID")
         if vehicleIDData then
@@ -79,7 +183,6 @@ function applyCustomModelVariant(vehicle, originalModel, variant1)
         end
     end
     
-    -- If still no ID, use hash of vehicle element pointer
     if vehicleID == 0 then
         local vehiclePointer = tostring(vehicle):match("%d+")
         vehicleID = (tonumber(vehiclePointer) or 0) % 1000
@@ -87,18 +190,22 @@ function applyCustomModelVariant(vehicle, originalModel, variant1)
     
     local uniqueCustomID = customModelData.customID + vehicleID
     
-    outputDebugString("[Vehicle Variants] Vehicle element ID: " .. vehicleID .. ", Unique custom ID: " .. uniqueCustomID)
+    outputDebugString("[Vehicle Variants] Replacing vehicle with custom ID: " .. uniqueCustomID)
     
-    -- Send request to all clients to load the custom model with unique ID
-    triggerClientEvent(root, "loadCustomModelVariant", resourceRoot, 
-        uniqueCustomID,  -- Use unique custom ID for this vehicle
+    -- Replace vehicle with custom model
+    local success, message, newVehicle = replaceVehicleWithCustomModel(
+        vehicle, 
+        uniqueCustomID, 
         customModelData.dff, 
         customModelData.txd, 
-        vehicle,
         originalModel
     )
     
-    return true, "Custom model ładowany..."
+    if success then
+        return true, "Pojazd zamieniony na custom model", newVehicle
+    else
+        return false, message
+    end
 end
 
 -- Handle confirmation from client that model was loaded
@@ -137,7 +244,7 @@ addEventHandler("onCustomModelLoaded", root, function(vehicle, finalModelID, suc
     end
 end)
 
--- Function to restore original model (sends request to client)
+-- Function to restore original model by replacing vehicle back
 function restoreOriginalModel(vehicle)
     if not vehicleOriginalModels[vehicle] then
         return false, "Brak zapisanego oryginalnego modelu"
@@ -145,10 +252,107 @@ function restoreOriginalModel(vehicle)
     
     local originalModel = vehicleOriginalModels[vehicle]
     
-    -- Send request to all clients to restore original model
-    triggerClientEvent(root, "restoreOriginalModelVariant", resourceRoot, vehicle, originalModel)
+    -- Replace vehicle back to original model (same as replaceVehicleWithCustomModel but with original model)
+    -- Save all vehicle properties (same as in replaceVehicleWithCustomModel)
+    local x, y, z = getElementPosition(vehicle)
+    local rx, ry, rz = getElementRotation(vehicle)
+    local health = getElementHealth(vehicle)
+    local color1, color2, color3, color4 = getVehicleColor(vehicle)
+    local paintjob = getVehiclePaintjob(vehicle)
+    local plateText = getVehiclePlateText(vehicle)
+    local locked = isVehicleLocked(vehicle)
+    local engineState = getVehicleEngineState(vehicle)
+    local lightsState = getVehicleLightState(vehicle)
     
-    return true, "Przywracanie oryginalnego modelu..."
+    local doorStates = {}
+    for i = 0, 5 do
+        doorStates[i] = getVehicleDoorState(vehicle, i)
+    end
+    
+    local wheelStates = {}
+    for i = 0, 3 do
+        wheelStates[i] = getVehicleWheelStates(vehicle, i)
+    end
+    
+    local panelStates = {}
+    for i = 0, 6 do
+        panelStates[i] = getVehiclePanelState(vehicle, i)
+    end
+    
+    local driver = getVehicleController(vehicle)
+    local passengers = {}
+    for i = 0, getVehicleMaxPassengers(vehicle) do
+        local passenger = getVehicleOccupant(vehicle, i)
+        if passenger then
+            passengers[i] = passenger
+        end
+    end
+    
+    local allData = {}
+    for key, value in pairs(getAllElementData(vehicle)) do
+        allData[key] = value
+    end
+    
+    -- Create new vehicle with original model
+    local newVehicle = createVehicle(originalModel, x, y, z, rx, ry, rz)
+    
+    if not newVehicle then
+        return false, "Nie udało się przywrócić oryginalnego pojazdu"
+    end
+    
+    -- Restore all properties (same as in replaceVehicleWithCustomModel)
+    setElementHealth(newVehicle, health)
+    setVehicleColor(newVehicle, color1, color2, color3, color4)
+    if paintjob then
+        setVehiclePaintjob(newVehicle, paintjob)
+    end
+    setVehiclePlateText(newVehicle, plateText)
+    setVehicleLocked(newVehicle, locked)
+    setVehicleEngineState(newVehicle, engineState)
+    setVehicleLightState(newVehicle, lightsState)
+    
+    for i = 0, 5 do
+        if doorStates[i] then
+            setVehicleDoorState(newVehicle, i, doorStates[i])
+        end
+    end
+    
+    for i = 0, 3 do
+        if wheelStates[i] then
+            setVehicleWheelStates(newVehicle, i, wheelStates[i])
+        end
+    end
+    
+    for i = 0, 6 do
+        if panelStates[i] then
+            setVehiclePanelState(newVehicle, i, panelStates[i])
+        end
+    end
+    
+    for key, value in pairs(allData) do
+        setElementData(newVehicle, key, value)
+    end
+    
+    -- Restore occupants
+    if driver then
+        warpPedIntoVehicle(driver, newVehicle, 0)
+    end
+    for seat, passenger in pairs(passengers) do
+        if seat > 0 then
+            warpPedIntoVehicle(passenger, newVehicle, seat)
+        end
+    end
+    
+    -- Restore original model on clients (if it was replaced)
+    triggerClientEvent(root, "restoreOriginalModelVariant", resourceRoot, originalModel)
+    
+    -- Clear stored original model (new vehicle is already original)
+    vehicleOriginalModels[newVehicle] = nil
+    
+    -- Destroy old vehicle
+    destroyElement(vehicle)
+    
+    return true, "Przywrócono oryginalny model", newVehicle
 end
 
 -- Handle confirmation from client that original model was restored
@@ -183,13 +387,17 @@ function setVehicleVariantSafe(vehicle, variant1, variant2)
     if variant1 == 0 then
         -- Always restore if we have stored original model
         if vehicleOriginalModels[vehicle] then
-            local success, message = restoreOriginalModel(vehicle)
+            local success, message, newVehicle = restoreOriginalModel(vehicle)
             if not success then
                 return false, message
             end
-            -- Set variant to 0,0
-            setVehicleVariant(vehicle, 0, variant2)
-            return true, "Przywrócono oryginalny model"
+            -- Set variant to 0,0 on new vehicle
+            if newVehicle then
+                setVehicleVariant(newVehicle, 0, variant2)
+                return true, "Przywrócono oryginalny model", newVehicle
+            else
+                return true, "Przywrócono oryginalny model"
+            end
         else
             -- No custom model was applied, just set variant normally
             setVehicleVariant(vehicle, 0, variant2)
@@ -198,13 +406,18 @@ function setVehicleVariantSafe(vehicle, variant1, variant2)
     else
         -- Check if there's a custom model for this variant
         if customModelVariants[originalModel] and customModelVariants[originalModel][variant1] then
-            local success, message = applyCustomModelVariant(vehicle, originalModel, variant1)
+            local success, message, newVehicle = applyCustomModelVariant(vehicle, originalModel, variant1)
             if not success then
                 return false, message
             end
             -- Still set the game variant (for compatibility)
-            setVehicleVariant(vehicle, variant1, variant2)
-            return true, "Custom model variant zastosowany"
+            if newVehicle then
+                setVehicleVariant(newVehicle, variant1, variant2)
+                return true, "Custom model variant zastosowany", newVehicle
+            else
+                setVehicleVariant(vehicle, variant1, variant2)
+                return true, "Custom model variant zastosowany"
+            end
         end
     end
     
