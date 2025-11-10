@@ -62,7 +62,8 @@ function replaceVehicleWithCustomModel(vehicle, customModelID, dffPath, txdPath,
     local plateText = getVehiclePlateText(vehicle)
     local locked = isVehicleLocked(vehicle)
     local engineState = getVehicleEngineState(vehicle)
-    local lightsState = getVehicleLightState(vehicle)
+    -- Note: getVehicleLightState requires light ID, so we skip saving lights state
+    -- Lights are usually managed automatically by the game
     local doorStates = {}
     for i = 0, 5 do
         doorStates[i] = getVehicleDoorState(vehicle, i)
@@ -113,7 +114,7 @@ function replaceVehicleWithCustomModel(vehicle, customModelID, dffPath, txdPath,
     setVehiclePlateText(newVehicle, plateText)
     setVehicleLocked(newVehicle, locked)
     setVehicleEngineState(newVehicle, engineState)
-    setVehicleLightState(newVehicle, lightsState)
+    -- Note: Lights state is not saved/restored (getVehicleLightState requires light ID)
     
     for i = 0, 5 do
         if doorStates[i] then
@@ -262,7 +263,7 @@ function restoreOriginalModel(vehicle)
     local plateText = getVehiclePlateText(vehicle)
     local locked = isVehicleLocked(vehicle)
     local engineState = getVehicleEngineState(vehicle)
-    local lightsState = getVehicleLightState(vehicle)
+    -- Note: getVehicleLightState requires light ID, so we skip saving lights state
     
     local doorStates = {}
     for i = 0, 5 do
@@ -309,7 +310,7 @@ function restoreOriginalModel(vehicle)
     setVehiclePlateText(newVehicle, plateText)
     setVehicleLocked(newVehicle, locked)
     setVehicleEngineState(newVehicle, engineState)
-    setVehicleLightState(newVehicle, lightsState)
+    -- Note: Lights state is not saved/restored (getVehicleLightState requires light ID)
     
     for i = 0, 5 do
         if doorStates[i] then
