@@ -61,9 +61,24 @@ function applyCustomModelVariant(vehicle, originalModel, variant1)
         vehicleOriginalModels[vehicle] = originalModel
     end
     
-    -- Send request to all clients to load the custom model
+    -- Generate unique custom ID for this specific vehicle using element ID
+    -- Base custom ID + vehicle element ID = unique ID per vehicle
+    local vehicleID = getElementID(vehicle) or getElementData(vehicle, "vehicleID") or 0
+    local uniqueCustomID = customModelData.customID + vehicleID
+    
+    -- If vehicle doesn't have ID, use a hash of the vehicle element
+    if vehicleID == 0 then
+        -- Use a simple hash based on vehicle pointer/memory address
+        -- This creates a unique ID for each vehicle instance
+        local vehiclePointer = tostring(vehicle):match("%d+")
+        uniqueCustomID = customModelData.customID + (tonumber(vehiclePointer) % 1000)
+    end
+    
+    outputDebugString("[Vehicle Variants] Vehicle element ID: " .. vehicleID .. ", Unique custom ID: " .. uniqueCustomID)
+    
+    -- Send request to all clients to load the custom model with unique ID
     triggerClientEvent(root, "loadCustomModelVariant", resourceRoot, 
-        customModelData.customID, 
+        uniqueCustomID,  -- Use unique custom ID for this vehicle
         customModelData.dff, 
         customModelData.txd, 
         vehicle,
@@ -77,10 +92,33 @@ end
 addEvent("onCustomModelLoaded", true)
 addEventHandler("onCustomModelLoaded", root, function(vehicle, finalModelID, success, message)
     if success and isElement(vehicle) then
-        outputDebugString("[Vehicle Variants] Custom model loaded successfully")
-        -- Note: Vehicle model is not changed - it stays as original model (560)
-        -- The model DFF was replaced using engineReplaceModel, so all vehicles of this type now use the custom model
-        -- When variant is set to 0, we'll restore the original model
+        outputDebugString("[Vehicle Variants] Custom model " .. finalModelID .. " loaded successfully")
+        
+        -- Try to change vehicle model to custom ID (if it's not original model)
+        if finalModelID ~= vehicleOriginalModels[vehicle] then
+            -- Wait a bit for model to be fully loaded
+            setTimer(function()
+                if isElement(vehicle) then
+                    local currentModel = getElementModel(vehicle)
+                    outputDebugString("[Vehicle Variants] Attempting to change vehicle model from " .. currentModel .. " to " .. finalModelID)
+                    
+                    -- Try to change model to custom ID
+                    local modelChanged = setElementModel(vehicle, finalModelID)
+                    local newModel = getElementModel(vehicle)
+                    
+                    outputDebugString("[Vehicle Variants] setElementModel(" .. finalModelID .. ") result: " .. tostring(modelChanged) .. ", new model: " .. newModel)
+                    
+                    if newModel == finalModelID then
+                        outputDebugString("[Vehicle Variants] SUCCESS! Vehicle model changed to custom ID " .. finalModelID)
+                    else
+                        outputDebugString("[Vehicle Variants] WARNING: setElementModel failed - custom ID may not work for vehicles")
+                        outputDebugString("[Vehicle Variants] Vehicle will use original model with replaced DFF (affects all vehicles of this type)")
+                    end
+                end
+            end, 200, 1) -- Wait 200ms for model to be ready
+        else
+            outputDebugString("[Vehicle Variants] Using original model with replaced DFF (affects all vehicles of this type)")
+        end
     else
         outputDebugString("[Vehicle Variants] Failed to load custom model: " .. tostring(message))
     end

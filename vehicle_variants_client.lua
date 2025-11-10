@@ -52,28 +52,41 @@ function loadCustomModel(customID, dffPath, txdPath, originalModel)
         outputChatBox("[DEBUG] Attempting to load DFF: " .. dffPath, 255, 255, 0)
         outputDebugString("[Vehicle Variants Client] Attempting to load DFF: " .. dffPath)
         
-        -- NOTE: In MTA:SA, we cannot use custom IDs as vehicle models with setElementModel
-        -- We must use the original model ID (560) with engineReplaceModel
-        -- This will change ALL vehicles of this type, but it's the only way it works
-        local dff = engineLoadDFF(dffPath, originalModel)
+        -- Try using unique custom ID for this specific vehicle
+        -- First, try to free and load model with custom ID
+        engineFreeModel(customID)
+        
+        local dff = engineLoadDFF(dffPath, customID)
         local replaced = false
         
         if dff then
-            outputChatBox("[DEBUG] DFF loaded! Replacing model " .. originalModel, 255, 255, 0)
-            outputDebugString("[Vehicle Variants Client] DFF loaded successfully, attempting to replace model " .. originalModel)
-            -- Replace original model (this affects ALL vehicles of this type)
-            replaced = engineReplaceModel(dff, originalModel)
+            outputChatBox("[DEBUG] DFF loaded with custom ID " .. customID .. "! Trying to replace...", 255, 255, 0)
+            outputDebugString("[Vehicle Variants Client] DFF loaded with custom ID, attempting to replace model " .. customID)
+            -- Try to replace custom ID model
+            replaced = engineReplaceModel(dff, customID)
             if replaced then
-                outputChatBox("[SUCCESS] Model " .. originalModel .. " replaced!", 0, 255, 0)
-                outputDebugString("[Vehicle Variants Client] Successfully replaced model " .. originalModel)
-                customID = originalModel -- Use original model ID
+                outputChatBox("[SUCCESS] Custom model " .. customID .. " loaded!", 0, 255, 0)
+                outputDebugString("[Vehicle Variants Client] Successfully replaced model " .. customID)
+                -- Keep customID - we'll try to use it with setElementModel
             else
-                outputChatBox("[ERROR] Failed to replace model " .. originalModel, 255, 0, 0)
-                outputDebugString("[Vehicle Variants Client] Failed to replace model " .. originalModel)
+                outputChatBox("[WARNING] Failed to replace custom model, trying original model", 255, 165, 0)
+                outputDebugString("[Vehicle Variants Client] Failed to replace custom model, trying original")
             end
         else
-            outputChatBox("[ERROR] Failed to load DFF - file may not exist: " .. dffPath, 255, 0, 0)
-            outputDebugString("[Vehicle Variants Client] Failed to load DFF with original model ID")
+            outputChatBox("[WARNING] Failed to load DFF with custom ID, trying original model", 255, 165, 0)
+            outputDebugString("[Vehicle Variants Client] Failed to load DFF with custom ID")
+        end
+        
+        -- Fallback: Use original model if custom ID fails
+        if not replaced then
+            outputChatBox("[INFO] Using original model (will affect all vehicles of this type)", 255, 255, 0)
+            dff = engineLoadDFF(dffPath, originalModel)
+            if dff then
+                replaced = engineReplaceModel(dff, originalModel)
+                if replaced then
+                    customID = originalModel
+                end
+            end
         end
         
         if not replaced then
